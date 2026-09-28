@@ -90,10 +90,10 @@ fn resolve_release_record<'a>(
     arch: &str,
 ) -> Result<&'a Release> {
     let requested = normalize_version(requested)?;
-    let platform = format!("win-{arch}");
+    let archive = format!("win-{arch}-zip");
     let mut candidates = releases
         .iter()
-        .filter(|release| release.files.iter().any(|file| file == &platform))
+        .filter(|release| release.files.iter().any(|file| file == &archive))
         .filter(|release| release_matches(&requested, release))
         .collect::<Vec<_>>();
     candidates.sort_by(|left, right| compare_versions(&right.version, &left.version));
@@ -178,17 +178,17 @@ mod tests {
         let releases = vec![
             Release {
                 version: "v24.3.0".into(),
-                files: vec!["win-x64".into()],
+                files: vec!["win-x64-zip".into()],
                 lts: serde_json::json!("Krypton"),
             },
             Release {
                 version: "v24.4.0".into(),
-                files: vec!["win-arm64".into()],
+                files: vec!["win-arm64-zip".into()],
                 lts: serde_json::json!("Krypton"),
             },
             Release {
                 version: "v26.0.0".into(),
-                files: vec!["win-x64".into()],
+                files: vec!["win-x64-zip".into()],
                 lts: serde_json::Value::Bool(false),
             },
         ];
