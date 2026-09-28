@@ -1,0 +1,54 @@
+name: Windows CI
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Run Rust tests
+        run: cargo test --locked
+
+      - name: Build release binary
+        run: cargo build --release --locked
+
+      - name: Upload release binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: nvm-windows-x64
+          path: target/release/nvm-for-windows-rs.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  smoke-test:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nvm-windows-x64
+          path: ${{ runner.temp }}\nvm-artifact
+
+      - name: Add downloaded binary to PATH
+        shell: pwsh
+        run: |
+          $binDir = Join-Path $env:RUNNER_TEMP 'nvm-bin'
+          New-Item -ItemType Directory -Force $binDir | Out-Null
+          Copy-Item (Join-Path $env:RUNNER_TEMP 'nvm-artifact\nvm-for-windows-rs.exe') $binDir
+          Add-Content -Path $env:GITHUB_PATH -Value $binDir
+
+      - name: Exercise downloaded binary and Node.js shims
+        shell: pwsh
+        run: ./tests/ci-smoke.ps1

@@ -118,8 +118,8 @@ mod tests {
     #[test]
     fn child_path_prefers_selected_node_before_global_tools() {
         let temp = tempfile::tempdir().unwrap();
-        let version = temp.path().join("versions/v22.0.0");
-        let globals = temp.path().join("globals/v22.0.0");
+        let version = temp.path().join("versions/v26.0.0");
+        let globals = temp.path().join("globals/v26.0.0");
         let existing = OsString::from(r"C:\Windows;C:\Tools");
         let entries = std::env::split_paths(&child_path(&version, &globals, &existing).unwrap())
             .collect::<Vec<_>>();

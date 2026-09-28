@@ -177,37 +177,37 @@ mod tests {
     fn remote_resolution_filters_architecture_and_lts_line() {
         let releases = vec![
             Release {
-                version: "v22.3.0".into(),
+                version: "v24.3.0".into(),
                 files: vec!["win-x64".into()],
-                lts: serde_json::json!("Jod"),
+                lts: serde_json::json!("Krypton"),
             },
             Release {
-                version: "v22.4.0".into(),
+                version: "v24.4.0".into(),
                 files: vec!["win-arm64".into()],
-                lts: serde_json::json!("Jod"),
+                lts: serde_json::json!("Krypton"),
             },
             Release {
-                version: "v23.0.0".into(),
+                version: "v26.0.0".into(),
                 files: vec!["win-x64".into()],
                 lts: serde_json::Value::Bool(false),
             },
         ];
         assert_eq!(
-            resolve_release_record("lts/jod", &releases, "x64")
+            resolve_release_record("lts/krypton", &releases, "x64")
                 .unwrap()
                 .version,
-            "v22.3.0"
+            "v24.3.0"
         );
-        assert!(resolve_release_record("23", &releases, "arm64").is_err());
+        assert!(resolve_release_record("26", &releases, "arm64").is_err());
     }
 
     #[test]
     fn checksum_parser_matches_the_exact_archive_name() {
-        let sums = "abcd  node-v20.0.0-win-x64.zip\nef01  node-v20.0.0-win-arm64.zip\n";
+        let sums = "abcd  node-v24.0.0-win-x64.zip\nef01  node-v24.0.0-win-arm64.zip\n";
         assert_eq!(
-            checksum_for(sums, "node-v20.0.0-win-x64.zip").unwrap(),
+            checksum_for(sums, "node-v24.0.0-win-x64.zip").unwrap(),
             "abcd"
         );
-        assert!(checksum_for(sums, "node-v20.0.0-win-x86.zip").is_err());
+        assert!(checksum_for(sums, "node-v24.0.0-win-x86.zip").is_err());
     }
 }

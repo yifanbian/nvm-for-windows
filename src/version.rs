@@ -167,14 +167,14 @@ mod tests {
         let paths = NvmPaths {
             root: temp.path().join("nvm"),
         };
-        fs::create_dir_all(paths.versions_dir().join("v20.12.0")).unwrap();
-        fs::create_dir_all(paths.versions_dir().join("v22.1.0")).unwrap();
+        fs::create_dir_all(paths.versions_dir().join("v24.12.0")).unwrap();
+        fs::create_dir_all(paths.versions_dir().join("v26.1.0")).unwrap();
         fs::create_dir_all(temp.path().join("project")).unwrap();
-        fs::write(paths.settings_file(), r#"{"default":"22"}"#).unwrap();
-        fs::write(temp.path().join("project/.nvmrc"), "20\n").unwrap();
+        fs::write(paths.settings_file(), r#"{"default":"26"}"#).unwrap();
+        fs::write(temp.path().join("project/.nvmrc"), "24\n").unwrap();
         assert_eq!(
             paths.select_version(&temp.path().join("project")).unwrap(),
-            "v20.12.0"
+            "v24.12.0"
         );
     }
 
@@ -184,8 +184,8 @@ mod tests {
         let project = temp.path().join("project");
         let nested = project.join("src").join("lib");
         fs::create_dir_all(&nested).unwrap();
-        fs::write(project.join(".nvmrc"), "# app version\n  20.11 # pinned\n").unwrap();
-        assert_eq!(find_nvmrc(&nested).unwrap().as_deref(), Some("20.11"));
+        fs::write(project.join(".nvmrc"), "# app version\n  24.11 # pinned\n").unwrap();
+        assert_eq!(find_nvmrc(&nested).unwrap().as_deref(), Some("24.11"));
     }
 
     #[test]
@@ -194,12 +194,12 @@ mod tests {
         let paths = NvmPaths {
             root: temp.path().to_path_buf(),
         };
-        for version in ["v20.9.0", "v20.10.0", "v18.20.4"] {
+        for version in ["v24.9.0", "v24.10.0", "v18.20.4"] {
             fs::create_dir_all(paths.versions_dir().join(version)).unwrap();
         }
         assert_eq!(
             paths.installed_versions().unwrap(),
-            ["v20.10.0", "v20.9.0", "v18.20.4"]
+            ["v24.10.0", "v24.9.0", "v18.20.4"]
         );
     }
 
@@ -209,17 +209,16 @@ mod tests {
         let paths = NvmPaths {
             root: temp.path().to_path_buf(),
         };
-        for (version, lts) in [("v20.18.0", "Iron"), ("v22.11.0", "Jod")] {
+        for (version, metadata) in [
+            ("v24.18.0", r#"{"lts":"Krypton"}"#),
+            ("v26.11.0", r#"{"lts":null}"#),
+        ] {
             let directory = paths.versions_dir().join(version);
             fs::create_dir_all(&directory).unwrap();
-            fs::write(
-                directory.join(".nvm-release.json"),
-                format!(r#"{{"lts":"{lts}"}}"#),
-            )
-            .unwrap();
+            fs::write(directory.join(".nvm-release.json"), metadata).unwrap();
         }
-        assert_eq!(paths.resolve_installed("lts/*").unwrap(), "v22.11.0");
-        assert_eq!(paths.resolve_installed("lts/iron").unwrap(), "v20.18.0");
+        assert_eq!(paths.resolve_installed("lts/*").unwrap(), "v24.18.0");
+        assert_eq!(paths.resolve_installed("lts/krypton").unwrap(), "v24.18.0");
     }
 
     #[test]
@@ -228,12 +227,12 @@ mod tests {
         let paths = NvmPaths {
             root: temp.path().to_path_buf(),
         };
-        fs::create_dir_all(paths.versions_dir().join("v20.12.0")).unwrap();
-        fs::create_dir_all(paths.globals_dir("v20.12.0")).unwrap();
-        fs::write(paths.settings_file(), r#"{"default":"20"}"#).unwrap();
-        paths.uninstall("20.12.0").unwrap();
-        assert!(!paths.versions_dir().join("v20.12.0").exists());
-        assert!(!paths.globals_dir("v20.12.0").exists());
+        fs::create_dir_all(paths.versions_dir().join("v24.12.0")).unwrap();
+        fs::create_dir_all(paths.globals_dir("v24.12.0")).unwrap();
+        fs::write(paths.settings_file(), r#"{"default":"24"}"#).unwrap();
+        paths.uninstall("24.12.0").unwrap();
+        assert!(!paths.versions_dir().join("v24.12.0").exists());
+        assert!(!paths.globals_dir("v24.12.0").exists());
         assert!(paths.load_settings().unwrap().default.is_none());
     }
 }
