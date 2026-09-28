@@ -11,9 +11,29 @@ cargo test
 cargo build --release
 ```
 
-## Setup
+## Install
 
-Set `NVM_HOME` to choose the data directory. By default, data is stored in `%LOCALAPPDATA%\nvm-rs`. Run the release binary once:
+Requires PowerShell and an internet connection. Run the installer directly from GitHub:
+
+```powershell
+irm https://raw.githubusercontent.com/yifanbian/nvm-for-windows/main/scripts/install.ps1 | iex
+nvm install lts/*
+```
+
+The installer downloads the executable from the latest GitHub Release and installs it under `%LOCALAPPDATA%\nvm-rs`. It does not require Git or Rust. It also creates command shims and adds the shim directory to the current user's PATH. Set `NVM_HOME` first to choose a different data directory:
+
+```powershell
+$env:NVM_HOME = 'D:\Tools\nvm-rs'
+irm https://raw.githubusercontent.com/yifanbian/nvm-for-windows/main/scripts/install.ps1 | iex
+```
+
+Restart PowerShell after installation. Windows Developer Mode or an elevated terminal may be required to create symlinks. Confirm `where.exe node` resolves to the nvm `shims` directory; an earlier machine-level Node.js PATH entry must be removed or reordered.
+
+Before first installation, a maintainer must push a version tag such as `v0.1.0`. Actions runs the Windows build and tests, then publishes the executable as a GitHub Release asset. Future installer runs download the latest published release.
+
+## Manual Setup
+
+If you already built the release binary, you can configure it manually:
 
 ```powershell
 .\target\release\nvm-for-windows-rs.exe setup
