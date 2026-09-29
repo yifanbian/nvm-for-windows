@@ -28,8 +28,10 @@ impl NvmPaths {
     }
 
     pub fn select_version(&self, cwd: &Path) -> Result<String> {
-        let settings = self.load_settings()?;
-        if let Some(requested) = find_nvmrc(cwd)?.or(settings.default) {
+        if let Some(requested) = find_nvmrc(cwd)? {
+            return self.resolve_installed(&requested);
+        }
+        if let Some(requested) = self.load_settings()?.default {
             return self.resolve_installed(&requested);
         }
         self.installed_versions()?
@@ -40,6 +42,13 @@ impl NvmPaths {
 
     pub fn resolve_installed(&self, requested: &str) -> Result<String> {
         let requested = normalize_version(requested)?;
+        if is_full_version(&requested) {
+            let version = format!("v{requested}");
+            if self.versions_dir().join(&version).is_dir() {
+                return Ok(version);
+            }
+            bail!("Node.js {requested} is not installed; run `nvm install {requested}`")
+        }
         let versions = self.installed_versions()?;
         if matches!(requested.as_str(), "node" | "latest") {
             return versions
@@ -146,6 +155,14 @@ pub(super) fn normalize_version(requested: &str) -> Result<String> {
     Ok(requested.to_owned())
 }
 
+fn is_full_version(requested: &str) -> bool {
+    let mut components = requested.split('.');
+    components.clone().count() == 3
+        && components.all(|component| {
+            !component.is_empty() && component.chars().all(|ch| ch.is_ascii_digit())
+        })
+}
+
 pub(super) fn compare_versions(left: &str, right: &str) -> std::cmp::Ordering {
     match (
         Version::parse(left.trim_start_matches('v')),
@@ -176,6 +193,33 @@ mod tests {
             paths.select_version(&temp.path().join("project")).unwrap(),
             "v24.12.0"
         );
+    }
+
+    #[test]
+    fn project_nvmrc_selection_does_not_read_settings() {
+        let temp = tempfile::tempdir().unwrap();
+        let paths = NvmPaths {
+            root: temp.path().join("nvm"),
+        };
+        fs::create_dir_all(paths.versions_dir().join("v24.12.0")).unwrap();
+        let project = temp.path().join("project");
+        fs::create_dir_all(&project).unwrap();
+        fs::write(project.join(".nvmrc"), "24.12.0\n").unwrap();
+        fs::write(paths.settings_file(), "not valid json").unwrap();
+
+        assert_eq!(paths.select_version(&project).unwrap(), "v24.12.0");
+    }
+
+    #[test]
+    fn exact_version_resolves_without_enumerating_versions() {
+        let temp = tempfile::tempdir().unwrap();
+        let paths = NvmPaths {
+            root: temp.path().to_path_buf(),
+        };
+        fs::create_dir_all(paths.versions_dir().join("v24.12.0")).unwrap();
+        fs::write(paths.versions_dir().join("not-a-directory"), "ignored").unwrap();
+
+        assert_eq!(paths.resolve_installed("24.12.0").unwrap(), "v24.12.0");
     }
 
     #[test]
