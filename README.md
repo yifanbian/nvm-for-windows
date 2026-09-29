@@ -44,7 +44,7 @@ nvm install lts/*
 
 ## Version selection
 
-The closest `.nvmrc` found by walking upward from the current directory takes precedence over `settings.json`. `nvm use <version>` changes the persistent default; a project pin still takes precedence. Without a project pin or a configured default, the newest installed version is selected.
+The closest `.nvmrc` found by walking upward from the current directory takes precedence over `settings.json`. Run `nvm install` inside a project to install the version specified by its `.nvmrc`; an explicit `nvm install <version>` overrides it. `nvm use <version>` changes the persistent default; a project pin still takes precedence. Without a project pin or a configured default, the newest installed version is selected.
 
 ```powershell
 nvm install 22

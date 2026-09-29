@@ -1,6 +1,7 @@
 use anyhow::{Context, Result, bail};
-use nvm_for_windows_rs::{NvmPaths, ShimCommand, run_shim};
+use nvm_for_windows_rs::{NvmPaths, ShimCommand, find_nvmrc, run_shim};
 use std::ffi::OsString;
+use std::path::Path;
 
 fn main() {
     let code = match run() {
@@ -31,8 +32,8 @@ fn run() -> Result<i32> {
         .collect::<Result<Vec<_>>>()?;
     match command {
         "install" => {
-            let requested = required(&values, "install <version>")?;
-            println!("Installed Node.js {}", paths.install(requested)?);
+            let requested = install_requested_version(&values, &std::env::current_dir()?)?;
+            println!("Installed Node.js {}", paths.install(&requested)?);
         }
         "list" | "ls" => {
             let settings = paths.load_settings()?;
@@ -85,6 +86,15 @@ fn required<'a>(args: &'a [String], usage: &str) -> Result<&'a str> {
         .with_context(|| format!("expected `nvm {usage}`"))
 }
 
+fn install_requested_version(args: &[String], cwd: &Path) -> Result<String> {
+    if let Some(requested) = args.first() {
+        return Ok(requested.clone());
+    }
+    find_nvmrc(cwd)?.with_context(|| {
+        "expected `nvm install <version>` or a .nvmrc in the current or a parent directory"
+    })
+}
+
 fn os_to_string(value: &OsString) -> Result<String> {
     value
         .to_str()
@@ -94,6 +104,42 @@ fn os_to_string(value: &OsString) -> Result<String> {
 
 fn print_help() {
     println!(
-        "nvm-for-windows-rs\n\nCommands:\n  nvm install <version|lts/*>  Download and install Node.js\n  nvm list                     List installed versions\n  nvm use [version]            Set the default or select the project version\n  nvm current                  Print the effective project version\n  nvm which                    Print the selected node.exe path\n  nvm uninstall <version>      Remove a version and its global packages\n  nvm setup                    Create command shims and update user PATH\n\nProject .nvmrc takes precedence over settings.json."
+        "nvm-for-windows-rs\n\nCommands:\n  nvm install [version|lts/*]  Install a version, or use the nearest .nvmrc\n  nvm list                     List installed versions\n  nvm use [version]            Set the default or select the project version\n  nvm current                  Print the effective project version\n  nvm which                    Print the selected node.exe path\n  nvm uninstall <version>      Remove a version and its global packages\n  nvm setup                    Create command shims and update user PATH\n\nProject .nvmrc takes precedence over settings.json."
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn install_without_argument_uses_nearest_nvmrc() {
+        let temp = tempfile::tempdir().unwrap();
+        let project = temp.path().join("project");
+        let nested = project.join("src");
+        fs::create_dir_all(&nested).unwrap();
+        fs::write(project.join(".nvmrc"), "26\n").unwrap();
+
+        assert_eq!(install_requested_version(&[], &nested).unwrap(), "26");
+    }
+
+    #[test]
+    fn explicit_install_version_overrides_nvmrc() {
+        let temp = tempfile::tempdir().unwrap();
+        fs::write(temp.path().join(".nvmrc"), "26\n").unwrap();
+
+        assert_eq!(
+            install_requested_version(&["24".into()], temp.path()).unwrap(),
+            "24"
+        );
+    }
+
+    #[test]
+    fn install_without_argument_or_nvmrc_returns_usage_error() {
+        let temp = tempfile::tempdir().unwrap();
+
+        let error = install_requested_version(&[], temp.path()).unwrap_err();
+        assert!(error.to_string().contains("nvm install <version>"));
+    }
 }
