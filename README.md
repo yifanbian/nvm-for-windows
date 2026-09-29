@@ -63,7 +63,7 @@ Settings are stored in `%NVM_HOME%\settings.json`:
 }
 ```
 
-Supported architectures are `x64`, `arm64`, and `x86`. `npm install -g` writes to a version-specific prefix under `%NVM_HOME%\globals`, isolating global packages between Node.js versions.
+Supported architectures are `x64`, `arm64`, and `x86`. `npm install -g` writes to a version-specific prefix under `%NVM_HOME%\globals`, isolating global packages between Node.js versions. The corresponding global executable directory is added to the `PATH` of processes launched through an nvm shim, but not to the interactive shell's `PATH`. Therefore, a globally installed CLI may not be directly callable by name from PowerShell. Use a project-local dev dependency with `npx`/`npm exec`, or invoke the CLI through a shim-launched process.
 
 ## Dispatch
 
