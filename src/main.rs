@@ -90,9 +90,9 @@ fn install_requested_version(args: &[String], cwd: &Path) -> Result<String> {
     if let Some(requested) = args.first() {
         return Ok(requested.clone());
     }
-    find_nvmrc(cwd)?.with_context(|| {
-        "expected `nvm install <version>` or a .nvmrc in the current or a parent directory"
-    })
+    find_nvmrc(cwd)?.with_context(
+        || "expected `nvm install <version>` or a .nvmrc in the current or a parent directory",
+    )
 }
 
 fn os_to_string(value: &OsString) -> Result<String> {
