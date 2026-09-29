@@ -3,9 +3,11 @@ use super::version::{VersionMetadata, compare_versions, normalize_version};
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use std::fs;
+use std::fs::{self, File};
+use std::io;
 use std::path::Path;
 use std::process::Command;
+use zip::ZipArchive;
 
 impl NvmPaths {
     pub fn install(&self, requested: &str) -> Result<String> {
@@ -44,16 +46,9 @@ impl NvmPaths {
 
         let extracted = stage.join("extracted");
         fs::create_dir_all(&extracted)?;
-        let status = Command::new("powershell.exe")
-            .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"])
-            .arg("Expand-Archive -LiteralPath $env:NVM_ARCHIVE -DestinationPath $env:NVM_DEST -Force")
-            .env("NVM_ARCHIVE", &archive)
-            .env("NVM_DEST", &extracted)
-            .status()
-            .context("failed to start PowerShell for ZIP extraction")?;
-        if !status.success() {
+        if let Err(error) = extract_zip(&archive, &extracted) {
             let _ = fs::remove_dir_all(&stage);
-            bail!("PowerShell failed to extract {filename}");
+            return Err(error).with_context(|| format!("failed to extract {filename}"));
         }
         let extracted_root = fs::read_dir(&extracted)?
             .filter_map(std::result::Result::ok)
@@ -75,6 +70,35 @@ impl NvmPaths {
         }
         Ok(version)
     }
+}
+
+fn extract_zip(archive_path: &Path, destination: &Path) -> Result<()> {
+    let file = File::open(archive_path)
+        .with_context(|| format!("failed to open ZIP archive {}", archive_path.display()))?;
+    let mut archive = ZipArchive::new(file).context("invalid ZIP archive")?;
+
+    for index in 0..archive.len() {
+        let mut entry = archive
+            .by_index(index)
+            .context("failed to read ZIP entry")?;
+        let relative_path = entry
+            .enclosed_name()
+            .context("ZIP archive contains a path outside its destination")?;
+        let output_path = destination.join(relative_path);
+        if entry.is_dir() {
+            fs::create_dir_all(&output_path)?;
+            continue;
+        }
+        if let Some(parent) = output_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let mut output = File::create(&output_path).with_context(|| {
+            format!("failed to create extracted file {}", output_path.display())
+        })?;
+        io::copy(&mut entry, &mut output)
+            .with_context(|| format!("failed to extract {}", output_path.display()))?;
+    }
+    Ok(())
 }
 
 #[derive(Deserialize)]
@@ -172,6 +196,46 @@ impl HttpClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+    use zip::write::FileOptions;
+
+    fn write_test_zip(path: &Path, entry_name: &str, contents: &[u8]) {
+        let file = File::create(path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        zip.start_file(entry_name, FileOptions::default()).unwrap();
+        zip.write_all(contents).unwrap();
+        zip.finish().unwrap();
+    }
+
+    #[test]
+    fn extracts_nested_files_with_rust_zip_reader() {
+        let temp = tempfile::tempdir().unwrap();
+        let archive_path = temp.path().join("node.zip");
+        let output = temp.path().join("out");
+        write_test_zip(
+            &archive_path,
+            "node-v24.0.0-win-x64/bin/node.exe",
+            b"node binary",
+        );
+
+        extract_zip(&archive_path, &output).unwrap();
+
+        assert_eq!(
+            fs::read(output.join("node-v24.0.0-win-x64/bin/node.exe")).unwrap(),
+            b"node binary"
+        );
+    }
+
+    #[test]
+    fn rejects_zip_entries_that_escape_the_destination() {
+        let temp = tempfile::tempdir().unwrap();
+        let archive_path = temp.path().join("malicious.zip");
+        let output = temp.path().join("out");
+        write_test_zip(&archive_path, "../escaped.txt", b"outside");
+
+        assert!(extract_zip(&archive_path, &output).is_err());
+        assert!(!temp.path().join("escaped.txt").exists());
+    }
 
     #[test]
     fn remote_resolution_filters_architecture_and_lts_line() {
